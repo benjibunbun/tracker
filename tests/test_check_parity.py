@@ -274,14 +274,18 @@ def index():
     server.server_close()
 
 
-def fetch_lookups(lock: Path) -> dict:
-    """The answers worker.mjs hands check(): each lookup needs() names, keyed as the worker keys it, null for a 404."""
+def fetch_lookups(lock: Path, trim: bool = True) -> dict:
+    """The answers worker.mjs hands check(): each lookup needs() names, keyed as the worker keys it, null for a 404,
+    and trimmed by the worker's own trimProject as the worker trims them. So every looked-up case here compares the
+    CLI (which reads PyPI's whole JSON) with the driver on trimmed JSON: when a new wheelgap pin reads a field the
+    trimmers drop, a case whose canned JSON has that field fails. `trim=False` gives the untrimmed answers."""
     needed = json.loads(driver.needs(str(lock.parent), lock.name))
     assert "error" not in needed, needed
-    return {
+    docs = {
         (f"{l['name']}=={l['version']}" if l["version"] else l["name"]): answer(l["name"], l["version"])
         for l in needed["lookups"]
     }
+    return trim_json(docs) if trim else docs
 
 
 REQUIREMENTS = """\
@@ -401,7 +405,7 @@ def test_trimmed_recorded_project_still_matches_the_cli(tmp_path, index, monkeyp
     monkeypatch.setitem(PINNED, ("numpy", "2.3.4"), {"info": project["info"], "urls": project["releases"]["2.3.4"]})
     lock = tmp_path / "requirements.txt"
     lock.write_text(requirement + "\n", encoding="utf-8")
-    docs = fetch_lookups(lock)
+    docs = fetch_lookups(lock, trim=False)
     full, trimmed = run_driver(lock, docs), run_driver(lock, trim_json(docs))
     assert full == trimmed
     cli = run_cli(lock, "--no-cache", env={"WHEELGAP_INDEX_URL": index})

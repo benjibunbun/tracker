@@ -7,6 +7,8 @@ import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v314.0.8/full/pyod
 import { rawUrl, trimProject, trimReleases } from "./check-logic.mjs";
 
 // The wheelgap release the page runs; tests/test_check_driver.py tests driver.py against the same one.
+// When this changes, re-read what that release's pypi._fill_json_data, pypi._newest_matching and suggest._has_wheel
+// read from PyPI's JSON: trimProject/trimReleases in check-logic.mjs keep only those fields.
 export const WHEELGAP = "wheelgap==0.13.0";
 const MAX_FILE = 25 * 1024 * 1024;
 const MAX_FIX_LOOKUPS = 80;
