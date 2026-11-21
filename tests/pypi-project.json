@@ -1,0 +1,296 @@
+{
+  "source": "https://pypi.org/pypi/numpy/json",
+  "recorded": "2026-11-21",
+  "source_sha256": "b9188fde2ff9e3d6f244de88c7dd3f1790a0f79fb80ad39c1deb11f81356beaa",
+  "selection": "Recorded project JSON excerpt. Keep info fields listed here, last_serial, and releases 2.3.4, 2.4.0, 2.5.5. For each keep the sdist and CPython 3.13 manylinux x86_64 wheel; also keep the aarch64 wheel for 2.4.0 and 2.5.5. File metadata is unchanged. This leaves gaps and a newer fix without storing the full multi-megabyte response.",
+  "project": {
+    "info": {
+      "name": "numpy",
+      "version": "2.5.5",
+      "home_page": null,
+      "project_urls": {
+        "documentation": "https://numpy.org/doc/",
+        "download": "https://pypi.org/project/numpy/#files",
+        "homepage": "https://numpy.org",
+        "release notes": "https://numpy.org/doc/stable/release",
+        "source": "https://github.com/numpy/numpy",
+        "tracker": "https://github.com/numpy/numpy/issues"
+      },
+      "requires_python": ">=3.12",
+      "yanked": false,
+      "summary": "Fundamental package for array computing in Python",
+      "downloads": {
+        "last_day": -1,
+        "last_month": -1,
+        "last_week": -1
+      }
+    },
+    "last_serial": 43700614,
+    "releases": {
+      "2.3.4": [
+        {
+          "comment_text": null,
+          "core-metadata": {
+            "sha256": "02d05671e1cb75fe80fda9cfd9e7210872ba35b5d54be6e295493ef22a8080a8"
+          },
+          "digests": {
+            "blake2b_256": "9e7e7d306ff7cb143e6d975cfa7eb98a93e73495c4deabb7d1b5ecf09ea0fd69",
+            "md5": "76b42d07952a6add4003e67920a59a05",
+            "sha256": "fc8a63918b04b8571789688b2780ab2b4a33ab44bfe8ccea36d3eba51228c953"
+          },
+          "downloads": -1,
+          "filename": "numpy-2.3.4-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+          "has_sig": false,
+          "md5_digest": "76b42d07952a6add4003e67920a59a05",
+          "packagetype": "bdist_wheel",
+          "python_version": "cp313",
+          "requires_python": ">=3.11",
+          "size": 16636543,
+          "upload_time": "2025-10-15T16:16:21",
+          "upload_time_iso_8601": "2025-10-15T16:16:21.072038Z",
+          "url": "https://files.pythonhosted.org/packages/9e/7e/7d306ff7cb143e6d975cfa7eb98a93e73495c4deabb7d1b5ecf09ea0fd69/numpy-2.3.4-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+          "yanked": false,
+          "yanked_reason": null
+        },
+        {
+          "comment_text": null,
+          "core-metadata": false,
+          "digests": {
+            "blake2b_256": "b5f4098d2270d52b41f1bd7db9fc288aaa0400cb48c2a3e2af6fa365d9720947",
+            "md5": "8717ed1828a8a390c454c6636e91c46a",
+            "sha256": "a7d018bfedb375a8d979ac758b120ba846a7fe764911a64465fd87b8729f4a6a"
+          },
+          "downloads": -1,
+          "filename": "numpy-2.3.4.tar.gz",
+          "has_sig": false,
+          "md5_digest": "8717ed1828a8a390c454c6636e91c46a",
+          "packagetype": "sdist",
+          "python_version": "source",
+          "requires_python": ">=3.11",
+          "size": 20582187,
+          "upload_time": "2025-10-15T16:18:11",
+          "upload_time_iso_8601": "2025-10-15T16:18:11.770584Z",
+          "url": "https://files.pythonhosted.org/packages/b5/f4/098d2270d52b41f1bd7db9fc288aaa0400cb48c2a3e2af6fa365d9720947/numpy-2.3.4.tar.gz",
+          "yanked": false,
+          "yanked_reason": null
+        }
+      ],
+      "2.4.0": [
+        {
+          "comment_text": null,
+          "core-metadata": {
+            "sha256": "366ea2faa4d775c1d73ffd8afe1e2adafc5f4e0c5ebb3098329fe71c905cdcbc"
+          },
+          "digests": {
+            "blake2b_256": "93e9a949885a4e177493d61519377952186b6cbfdf1d6002764c664ba28349b5",
+            "md5": "f7b4ea9d23400e508e3bacb72d83a3cc",
+            "sha256": "f935c4493eda9069851058fa0d9e39dbf6286be690066509305e52912714dbb2"
+          },
+          "downloads": -1,
+          "filename": "numpy-2.4.0-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl",
+          "has_sig": false,
+          "md5_digest": "f7b4ea9d23400e508e3bacb72d83a3cc",
+          "packagetype": "bdist_wheel",
+          "python_version": "cp313",
+          "requires_python": ">=3.11",
+          "size": 14396562,
+          "upload_time": "2025-12-20T16:16:38",
+          "upload_time_iso_8601": "2025-12-20T16:16:38.953044Z",
+          "url": "https://files.pythonhosted.org/packages/93/e9/a949885a4e177493d61519377952186b6cbfdf1d6002764c664ba28349b5/numpy-2.4.0-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl",
+          "yanked": true,
+          "yanked_reason": "Backward compatibility bug"
+        },
+        {
+          "comment_text": null,
+          "core-metadata": {
+            "sha256": "366ea2faa4d775c1d73ffd8afe1e2adafc5f4e0c5ebb3098329fe71c905cdcbc"
+          },
+          "digests": {
+            "blake2b_256": "99989d4ad53b0e9ef901c2ef1d550d2136f5ac42d3fd2988390a6def32e23e48",
+            "md5": "e9629ab826ed5ff791bced9855b329c2",
+            "sha256": "8cfa5f29a695cb7438965e6c3e8d06e0416060cf0d709c1b1c1653a939bf5c2a"
+          },
+          "downloads": -1,
+          "filename": "numpy-2.4.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+          "has_sig": false,
+          "md5_digest": "e9629ab826ed5ff791bced9855b329c2",
+          "packagetype": "bdist_wheel",
+          "python_version": "cp313",
+          "requires_python": ">=3.11",
+          "size": 16351719,
+          "upload_time": "2025-12-20T16:16:41",
+          "upload_time_iso_8601": "2025-12-20T16:16:41.503729Z",
+          "url": "https://files.pythonhosted.org/packages/99/98/9d4ad53b0e9ef901c2ef1d550d2136f5ac42d3fd2988390a6def32e23e48/numpy-2.4.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+          "yanked": true,
+          "yanked_reason": "Backward compatibility bug"
+        },
+        {
+          "comment_text": null,
+          "core-metadata": false,
+          "digests": {
+            "blake2b_256": "a47a6a3d14e205d292b738db449d0de649b373a59edb0d0b4493821d0a3e8718",
+            "md5": "828b6c6df0b6f89b5cf799314d4ee2b6",
+            "sha256": "6e504f7b16118198f138ef31ba24d985b124c2c469fe8467007cf30fd992f934"
+          },
+          "downloads": -1,
+          "filename": "numpy-2.4.0.tar.gz",
+          "has_sig": false,
+          "md5_digest": "828b6c6df0b6f89b5cf799314d4ee2b6",
+          "packagetype": "sdist",
+          "python_version": "source",
+          "requires_python": ">=3.11",
+          "size": 20685720,
+          "upload_time": "2025-12-20T16:18:19",
+          "upload_time_iso_8601": "2025-12-20T16:18:19.023409Z",
+          "url": "https://files.pythonhosted.org/packages/a4/7a/6a3d14e205d292b738db449d0de649b373a59edb0d0b4493821d0a3e8718/numpy-2.4.0.tar.gz",
+          "yanked": true,
+          "yanked_reason": "Backward compatibility bug"
+        }
+      ],
+      "2.5.5": [
+        {
+          "comment_text": null,
+          "core-metadata": {
+            "sha256": "b184c8d5951f32a8b8b080ff80744e0b80523783061402446a5dcaf52dc40bff"
+          },
+          "digests": {
+            "blake2b_256": "5706de83b859944409bb9058bc6110581a3d7fc1f54d6df1222744911d7f6b19",
+            "md5": "ee2240a58c79be071c45a1c63667f5fc",
+            "sha256": "ae2b8285d0b4eed24739c3ca9ec0fa424a0247489c01e1d5fe2815a599e11d33"
+          },
+          "downloads": -1,
+          "filename": "numpy-2.5.5-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl",
+          "has_sig": false,
+          "md5_digest": "ee2240a58c79be071c45a1c63667f5fc",
+          "packagetype": "bdist_wheel",
+          "python_version": "cp313",
+          "requires_python": ">=3.12",
+          "size": 15278148,
+          "upload_time": "2026-11-15T21:30:41",
+          "upload_time_iso_8601": "2026-11-15T21:30:41.819861Z",
+          "url": "https://files.pythonhosted.org/packages/57/06/de83b859944409bb9058bc6110581a3d7fc1f54d6df1222744911d7f6b19/numpy-2.5.5-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl",
+          "yanked": false,
+          "yanked_reason": null
+        },
+        {
+          "comment_text": null,
+          "core-metadata": {
+            "sha256": "b184c8d5951f32a8b8b080ff80744e0b80523783061402446a5dcaf52dc40bff"
+          },
+          "digests": {
+            "blake2b_256": "40d668dd5a83914bbcaf32b3165993f7955979916708cb0156d1e28231e18803",
+            "md5": "d61c543c996fb3a63292fa64e8a4bb22",
+            "sha256": "824025655df929268bfe6b47ed91a00d14209a6f760847cf150be446829e1ce4"
+          },
+          "downloads": -1,
+          "filename": "numpy-2.5.5-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+          "has_sig": false,
+          "md5_digest": "d61c543c996fb3a63292fa64e8a4bb22",
+          "packagetype": "bdist_wheel",
+          "python_version": "cp313",
+          "requires_python": ">=3.12",
+          "size": 15713899,
+          "upload_time": "2026-11-15T21:30:44",
+          "upload_time_iso_8601": "2026-11-15T21:30:44.066162Z",
+          "url": "https://files.pythonhosted.org/packages/40/d6/68dd5a83914bbcaf32b3165993f7955979916708cb0156d1e28231e18803/numpy-2.5.5-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+          "yanked": false,
+          "yanked_reason": null
+        },
+        {
+          "comment_text": null,
+          "core-metadata": false,
+          "digests": {
+            "blake2b_256": "4e3a8770c288c47f0b5c2a786d3c20e79f66fd245f2d42cd232d7cd5e00e83e5",
+            "md5": "3953256e429018c3460e1d8b3741b410",
+            "sha256": "5cddc243c75114ba845f01b1f87aca1572dbf7b6c2d88636ed3e1d2bccd7f1bf"
+          },
+          "downloads": -1,
+          "filename": "numpy-2.5.5.tar.gz",
+          "has_sig": false,
+          "md5_digest": "3953256e429018c3460e1d8b3741b410",
+          "packagetype": "sdist",
+          "python_version": "source",
+          "requires_python": ">=3.12",
+          "size": 20873892,
+          "upload_time": "2026-11-15T21:32:28",
+          "upload_time_iso_8601": "2026-11-15T21:32:28.607313Z",
+          "url": "https://files.pythonhosted.org/packages/4e/3a/8770c288c47f0b5c2a786d3c20e79f66fd245f2d42cd232d7cd5e00e83e5/numpy-2.5.5.tar.gz",
+          "yanked": false,
+          "yanked_reason": null
+        }
+      ]
+    },
+    "urls": [
+      {
+        "comment_text": null,
+        "core-metadata": {
+          "sha256": "b184c8d5951f32a8b8b080ff80744e0b80523783061402446a5dcaf52dc40bff"
+        },
+        "digests": {
+          "blake2b_256": "5706de83b859944409bb9058bc6110581a3d7fc1f54d6df1222744911d7f6b19",
+          "md5": "ee2240a58c79be071c45a1c63667f5fc",
+          "sha256": "ae2b8285d0b4eed24739c3ca9ec0fa424a0247489c01e1d5fe2815a599e11d33"
+        },
+        "downloads": -1,
+        "filename": "numpy-2.5.5-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl",
+        "has_sig": false,
+        "md5_digest": "ee2240a58c79be071c45a1c63667f5fc",
+        "packagetype": "bdist_wheel",
+        "python_version": "cp313",
+        "requires_python": ">=3.12",
+        "size": 15278148,
+        "upload_time": "2026-11-15T21:30:41",
+        "upload_time_iso_8601": "2026-11-15T21:30:41.819861Z",
+        "url": "https://files.pythonhosted.org/packages/57/06/de83b859944409bb9058bc6110581a3d7fc1f54d6df1222744911d7f6b19/numpy-2.5.5-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl",
+        "yanked": false,
+        "yanked_reason": null
+      },
+      {
+        "comment_text": null,
+        "core-metadata": {
+          "sha256": "b184c8d5951f32a8b8b080ff80744e0b80523783061402446a5dcaf52dc40bff"
+        },
+        "digests": {
+          "blake2b_256": "40d668dd5a83914bbcaf32b3165993f7955979916708cb0156d1e28231e18803",
+          "md5": "d61c543c996fb3a63292fa64e8a4bb22",
+          "sha256": "824025655df929268bfe6b47ed91a00d14209a6f760847cf150be446829e1ce4"
+        },
+        "downloads": -1,
+        "filename": "numpy-2.5.5-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+        "has_sig": false,
+        "md5_digest": "d61c543c996fb3a63292fa64e8a4bb22",
+        "packagetype": "bdist_wheel",
+        "python_version": "cp313",
+        "requires_python": ">=3.12",
+        "size": 15713899,
+        "upload_time": "2026-11-15T21:30:44",
+        "upload_time_iso_8601": "2026-11-15T21:30:44.066162Z",
+        "url": "https://files.pythonhosted.org/packages/40/d6/68dd5a83914bbcaf32b3165993f7955979916708cb0156d1e28231e18803/numpy-2.5.5-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+        "yanked": false,
+        "yanked_reason": null
+      },
+      {
+        "comment_text": null,
+        "core-metadata": false,
+        "digests": {
+          "blake2b_256": "4e3a8770c288c47f0b5c2a786d3c20e79f66fd245f2d42cd232d7cd5e00e83e5",
+          "md5": "3953256e429018c3460e1d8b3741b410",
+          "sha256": "5cddc243c75114ba845f01b1f87aca1572dbf7b6c2d88636ed3e1d2bccd7f1bf"
+        },
+        "downloads": -1,
+        "filename": "numpy-2.5.5.tar.gz",
+        "has_sig": false,
+        "md5_digest": "3953256e429018c3460e1d8b3741b410",
+        "packagetype": "sdist",
+        "python_version": "source",
+        "requires_python": ">=3.12",
+        "size": 20873892,
+        "upload_time": "2026-11-15T21:32:28",
+        "upload_time_iso_8601": "2026-11-15T21:32:28.607313Z",
+        "url": "https://files.pythonhosted.org/packages/4e/3a/8770c288c47f0b5c2a786d3c20e79f66fd245f2d42cd232d7cd5e00e83e5/numpy-2.5.5.tar.gz",
+        "yanked": false,
+        "yanked_reason": null
+      }
+    ]
+  }
+}

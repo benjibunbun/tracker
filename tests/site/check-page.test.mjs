@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import * as checkLogic from "../../site/check/check-logic.mjs";
 
 const read = (name) => fs.readFileSync(new URL(`../../site/check/${name}`, import.meta.url), "utf8");
 const TOOL = "https://github.com/wheelgap/wheelgap";
@@ -69,32 +70,72 @@ function workerCheck({ needs, fetch, releases = new Map(), lockfile = "requireme
     return found[0];
   };
   const checked = [];
+  const fixed = [];
   const removed = [];
   // `gone`: paths the worker believes it wrote that aren't in Pyodide's files any more, so removing them throws.
   const unlink = (path) => { removed.push(path); if (gone.includes(path)) throw new Error(`ENOENT: ${path}`); };
   const driver = {
     needs: () => JSON.stringify(needs),
     check: (...args) => { checked.push(args); return JSON.stringify({ rows: [] }); },
+    fixes: (...args) => { fixed.push(args); return "{}"; },
   };
   const repo = { root: "/repos/1", ref: "HEAD", fetched: new Set(fetched) };
   const env = {
-    fetch, releases, MAX_LOOKUPS: 300,
+    fetch, releases, MAX_LOOKUPS: 300, MAX_FIX_LOOKUPS: 80,
+    trimProject: checkLogic.trimProject, trimReleases: checkLogic.trimReleases,
     ready: Promise.resolve({ py: { FS: { unlink } }, driver }),
     loaded: new Map([[repo.root, repo]]),
     post: () => {},
   };
   const made = new Function("env", `
-    const { fetch, releases, MAX_LOOKUPS, ready, loaded, post } = env;
+    const { fetch, releases, MAX_LOOKUPS, MAX_FIX_LOOKUPS, ready, loaded, post, trimProject, trimReleases } = env;
     let latestCheck = 7;
     class Failure extends Error { constructor(kind, message) { super(message); this.kind = kind; } }
     ${fn("pool")}
     ${fn("lookups")}
     ${fn("dropOtherProjects")}
     ${fn("check")}
-    return { check: (lockfile) => check(7, "/repos/1", lockfile, { pythons: ["3.14"] }), supersede: () => { latestCheck = 8; } };
+    ${fn("fixes")}
+    return {
+      check: (lockfile) => check(7, "/repos/1", lockfile, { pythons: ["3.14"] }),
+      fixes: (rows) => fixes(7, rows), supersede: () => { latestCheck = 8; },
+    };
   `)(env);
-  return { check: () => made.check(lockfile), supersede: made.supersede, checked, releases, removed, repo };
+  return { check: () => made.check(lockfile), fixes: made.fixes, supersede: made.supersede, checked, fixed, releases, removed, repo };
 }
+
+test("check trims pinned and project JSON before the driver and keeps only trimmed releases for fixes", async () => {
+  const file = { filename: "fastlib-1.0.tar.gz", requires_python: ">=3.13", yanked: false, digests: { sha256: "unused" } };
+  const doc = { info: { version: "1.0", description: "unused".repeat(1000) }, urls: [file], releases: { "1.0": [file] }, last_serial: 123 };
+  const needs = { lookups: [{ name: "fastlib", version: null }, { name: "pinned", version: "1.0" }], total: 2 };
+  const worker = workerCheck({ needs, fetch: async () => ({ ok: true, json: async () => structuredClone(doc) }) });
+  await worker.check();
+  const keptFile = { filename: file.filename, requires_python: ">=3.13", yanked: false };
+  const kept = { info: { version: "1.0" }, urls: [keptFile], releases: { "1.0": [keptFile] } };
+  assert.deepEqual(JSON.parse(worker.checked[0][3]), { fastlib: kept, "pinned==1.0": kept });
+  assert.deepEqual([...worker.releases], [["fastlib", kept.releases]]); // never cache a pinned response
+  assert.ok(worker.checked[0][3].length < JSON.stringify({ fastlib: doc, "pinned==1.0": doc }).length / 2);
+});
+
+test("fixes trims newly fetched releases and reuses the trimmed releases from check", async () => {
+  const fetched = [];
+  const file = { filename: "fastlib-2.0-py3-none-any.whl", yanked: false, url: "https://files.pythonhosted.org/unused" };
+  const doc = { info: { description: "unused" }, urls: [], releases: { "2.0": [file] } };
+  const worker = workerCheck({
+    needs: { lookups: [{ name: "cached", version: null }], total: 1 },
+    fetch: async (url) => { fetched.push(url); return { ok: true, json: async () => structuredClone(doc) }; },
+  });
+  await worker.check();
+  const rows = ["cached", "fresh"].map((name) => ({ name, version: "1.0", lookup: true, gaps: ["3.13 linux-x86_64"], keep: [] }));
+  await worker.fixes(rows);
+  const kept = { "2.0": [{ filename: file.filename, yanked: false }] };
+  assert.deepEqual(fetched, ["https://pypi.org/pypi/cached/json", "https://pypi.org/pypi/fresh/json"]);
+  assert.deepEqual([...worker.releases], [["cached", kept], ["fresh", kept]]);
+  assert.deepEqual(JSON.parse(worker.fixed[0][0]), { cached: kept, fresh: kept });
+  assert.deepEqual(JSON.parse(worker.fixed[0][1]), rows);
+  await worker.fixes(rows);
+  assert.equal(fetched.length, 2); // both compact lists survive for the next check's fixes
+});
 
 test("the worker looks up what the driver names on pypi.org and hands the answers to the driver's check", async () => {
   const urls = [];

@@ -4,8 +4,52 @@ import assert from "node:assert/strict";
 import {
   parseRepo, rawUrl, pickLockfile, toQuery, fromQuery, sortPythons, freeThreaded, fixFor, rowsFor, headline,
   cliCommand, fixPrompt, verdictText, nextSteps, validRef, labVerdict, labFor, canonicalName, gapWheelFor,
-  gapWheelFixText, withoutUnreadable, unreadableReason, tileText, missedText, badgeMarkdown,
+  gapWheelFixText, withoutUnreadable, unreadableReason, tileText, missedText, badgeMarkdown, trimProject, trimReleases,
 } from "../../site/check/check-logic.mjs";
+
+test("PyPI trimming keeps the pinned consumer's fields without changing the input", () => {
+  const file = {
+    filename: "demo-1.0-py3-none-any.whl", requires_python: ">=3.13", yanked: "withdrawn",
+    packagetype: "bdist_wheel", upload_time_iso_8601: "2026-11-21T00:00:00Z", size: 123,
+    url: "https://files.pythonhosted.org/unused", digests: { sha256: "unused" }, comment_text: "unused",
+  };
+  const doc = {
+    info: { version: "1.0", project_urls: { Source: "https://example.org/src" }, home_page: "https://example.org/",
+      description: "unused", requires_python: ">=3.13", yanked: true },
+    urls: [file], releases: { "1.0": [file], "0.9": [] }, last_serial: 123,
+  };
+  const before = structuredClone(doc);
+  const keptFile = { filename: file.filename, requires_python: ">=3.13", yanked: "withdrawn" };
+  const keptReleases = { "1.0": [keptFile], "0.9": [] };
+  assert.deepEqual(trimProject(doc), {
+    info: { version: "1.0", project_urls: doc.info.project_urls, home_page: doc.info.home_page },
+    urls: [keptFile], releases: keptReleases,
+  });
+  assert.deepEqual(trimReleases(doc.releases), keptReleases);
+  assert.deepEqual(doc, before);
+  // A JSON key named __proto__ must remain an ordinary entry, not set the returned object's prototype.
+  const special = trimReleases(JSON.parse('{"__proto__": [], "constructor": []}'));
+  assert.deepEqual(Object.keys(special), ["__proto__", "constructor"]);
+  assert.equal(Object.getPrototypeOf(special), Object.prototype);
+});
+
+test("trimming preserves malformed and missing shapes instead of inventing empty file lists", () => {
+  for (const bad of [null, false, 3, "not JSON metadata", [], [null]]) {
+    assert.deepEqual(trimProject(bad), bad);
+    assert.deepEqual(trimReleases(bad), bad);
+    assert.deepEqual(trimProject({ info: bad, urls: bad, releases: bad }), { info: bad, urls: bad, releases: bad });
+  }
+  assert.deepEqual(trimProject({ message: "Not Found" }), {}); // still missing urls and releases
+  assert.deepEqual(trimProject({ info: { version: "1.0" } }), { info: { version: "1.0" } });
+  assert.deepEqual(trimProject({ urls: [], releases: {} }), { urls: [], releases: {} }); // valid empty is distinct
+  const files = [null, false, "bad", [], {}, { filename: null }, { filename: 1 }, { yanked: false },
+    { filename: "demo.whl", requires_python: null, yanked: false }];
+  assert.deepEqual(trimProject({ urls: files }), { urls: files });
+  assert.deepEqual(trimReleases({ "1.0": files, "2.0": null, "3.0": {} }), { "1.0": files, "2.0": null, "3.0": {} });
+  // Invalid values of consumed metadata are the consumer's decision too, not the trimmer's.
+  assert.deepEqual(trimProject({ info: { version: null, project_urls: [], home_page: 4 } }),
+    { info: { version: null, project_urls: [], home_page: 4 } });
+});
 
 test("parseRepo reads the forms people paste", () => {
   const plain = { owner: "fastapi", name: "fastapi", ref: null, dir: null };

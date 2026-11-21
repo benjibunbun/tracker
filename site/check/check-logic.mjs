@@ -54,6 +54,35 @@ export function rawUrl(repo, ref, path) {
   return `https://raw.githubusercontent.com/${repo.owner}/${repo.name}/${enc(ref)}/${enc(path)}`;
 }
 
+const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+const pickFields = (value, fields) => isObject(value)
+  ? Object.fromEntries(fields.filter((key) => Object.hasOwn(value, key)).map((key) => [key, value[key]]))
+  : value;
+
+// wheelgap 0.13.0: pypi._files/_supports_python/_fill_json_data and suggest._has_wheel read these file fields.
+// Preserve malformed lists/entries and absent fields: normalising them to [] could turn "unknown" into a gap.
+const trimFiles = (files) => Array.isArray(files)
+  ? files.map((file) => pickFields(file, ["filename", "requires_python", "yanked"]))
+  : files;
+
+// Both range resolution (pypi._newest_matching) and fixes (suggest.suggest) read version -> file list.
+export function trimReleases(releases) {
+  return isObject(releases)
+    ? Object.fromEntries(Object.entries(releases).map(([version, files]) => [version, trimFiles(files)]))
+    : releases;
+}
+
+// Drop unused PyPI metadata before retaining it or serialising it into Pyodide. Re-audit the fields when the
+// worker's wheelgap pin changes: _fill_json_data reads the URLs and info, _newest_matching also reads releases.
+export function trimProject(doc) {
+  if (!isObject(doc)) return doc;
+  const trimmed = pickFields(doc, ["info", "urls", "releases"]);
+  if (Object.hasOwn(trimmed, "info")) trimmed.info = pickFields(trimmed.info, ["version", "project_urls", "home_page"]);
+  if (Object.hasOwn(trimmed, "urls")) trimmed.urls = trimFiles(trimmed.urls);
+  if (Object.hasOwn(trimmed, "releases")) trimmed.releases = trimReleases(trimmed.releases);
+  return trimmed;
+}
+
 // The file to start from: the first one in `dir` (the folder the URL named), else plan()'s first. plan() lists them
 // shallowest folder first and, in a folder, in the order `wheelgap` looks for them there, with a pyproject.toml
 // last. Every listed file can be checked, so a lockfile deeper in the repo never outranks a requirements.txt in the

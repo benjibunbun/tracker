@@ -25,6 +25,7 @@ import pytest
 
 pytest.importorskip("wheelgap.suggest_targets")
 from wheelgap import origin
+from pypi_json import recorded_project, trim_json
 
 SITE = Path(__file__).resolve().parent.parent / "site" / "check"
 sys.path.insert(0, str(SITE))
@@ -391,3 +392,17 @@ def test_a_looked_up_file_gets_the_clis_answer(tmp_path, index, name):
     assert page["skipped"] == LOOKED_UP_SKIPPED[name] and page["looked_up"] is True
     if "ranged" in lock.read_text(encoding="utf-8"):  # one entry per release the range resolves to
         assert sorted(r["version"] for r in page["rows"] if r["name"] == "ranged") == ["1.0", "2.0"]
+
+
+@pytest.mark.parametrize("requirement", ["numpy==2.3.4", "numpy>=2.3,<2.4", "numpy"])
+def test_trimmed_recorded_project_still_matches_the_cli(tmp_path, index, monkeypatch, requirement):
+    project = recorded_project()
+    monkeypatch.setitem(PROJECTS, "numpy", project)
+    monkeypatch.setitem(PINNED, ("numpy", "2.3.4"), {"info": project["info"], "urls": project["releases"]["2.3.4"]})
+    lock = tmp_path / "requirements.txt"
+    lock.write_text(requirement + "\n", encoding="utf-8")
+    docs = fetch_lookups(lock)
+    full, trimmed = run_driver(lock, docs), run_driver(lock, trim_json(docs))
+    assert full == trimmed
+    cli = run_cli(lock, "--no-cache", env={"WHEELGAP_INDEX_URL": index})
+    assert_same_answer(cli, trimmed)

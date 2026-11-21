@@ -12,6 +12,7 @@ import pytest
 
 pytest.importorskip("wheelgap.suggest_targets")
 from wheelgap import origin
+from pypi_json import recorded_project, trim_json
 
 SITE = Path(__file__).resolve().parent.parent / "site" / "check"
 sys.path.insert(0, str(SITE))
@@ -581,6 +582,83 @@ def test_an_answer_with_no_file_list_is_unknown_never_a_gap(tmp_path):
         ("fastlib", [], 3, False),
         ("ranged", [], 3, False),
     ]
+
+
+@pytest.mark.parametrize("requirement", ["numpy==2.3.4", "numpy>=2.3,<2.4", "numpy"])
+def test_trimmed_recorded_json_keeps_check_and_fixes_answers(tmp_path, requirement):
+    project = recorded_project()
+    pinned = requirement == "numpy==2.3.4"
+    doc = {"info": project["info"], "urls": project["releases"]["2.3.4"]} if pinned else project
+    docs = {"numpy==2.3.4" if pinned else "numpy": doc}
+    releases = {"numpy": project["releases"]}
+    trimmed, trimmed_releases = trim_json(docs), trim_json(releases, releases=True)
+    assert len(json.dumps(trimmed)) < len(json.dumps(docs)) / 2
+    assert len(json.dumps(trimmed_releases)) < len(json.dumps(releases)) / 2
+    (tmp_path / "requirements.txt").write_text(requirement + "\n", encoding="utf-8")
+    answers = []
+    for lookups, rel in [(docs, releases), (trimmed, trimmed_releases)]:
+        result = json.loads(driver.check(str(tmp_path), "requirements.txt", options(), json.dumps(lookups)))
+        fixes = json.loads(driver.fixes(json.dumps(rel), json.dumps(result["rows"])))
+        answers.append((result, fixes))
+    assert answers[0] == answers[1]
+    result, fixes = answers[1]
+    assert result["packages"] == 1 and result["rows"][0]["lookup"] is True
+    if requirement != "numpy":
+        # The recorded 2.4.0 files are yanked: they must not hide the next usable fix.
+        assert fixes["numpy==2.3.4"]["found"] == {"3.13 linux-aarch64": "2.5.5"}
+    else:
+        assert fixes == {"numpy==2.5.5": {"found": {}, "loses": []}}
+
+
+@pytest.mark.parametrize("requirement", ["fastlib==1.0", "fastlib>=1", "fastlib"])
+def test_trimming_preserves_yanks_python_constraints_and_invalid_releases(tmp_path, requirement):
+    old = [wheel("fastlib-1.0-cp313-cp313-manylinux_2_17_x86_64.whl", ">=3.13,<3.14"),
+           wheel("fastlib-1.0.tar.gz", ">=3.13,<3.14")]
+    newer = [wheel("fastlib-2.0-cp314-cp314-manylinux_2_17_x86_64.whl", ">=3.14"),
+             wheel("fastlib-2.0-cp314-cp314-manylinux_2_17_aarch64.whl", ">=3.14")]
+    releases = {"fastlib": {
+        "1.0": old, "2.0": newer,
+        "3.0": [{**wheel("fastlib-3.0-py3-none-any.whl"), "yanked": True}],
+        "4.0": [wheel("fastlib-4.0-py3-none-any.whl"), {}],  # reject the whole list, never filter the bad entry out
+    }}
+    project = {"info": {"version": "1.0"}, "urls": old, "releases": releases["fastlib"]}
+    docs = {"fastlib==1.0" if "==" in requirement else "fastlib": project}
+    (tmp_path / "requirements.txt").write_text(requirement + "\n", encoding="utf-8")
+    answers = []
+    for lookups, rel in [(docs, releases), (trim_json(docs), trim_json(releases, releases=True))]:
+        result = json.loads(driver.check(str(tmp_path), "requirements.txt", options(pythons=["3.13", "3.14"]), json.dumps(lookups)))
+        answers.append((result, json.loads(driver.fixes(json.dumps(rel), json.dumps(result["rows"])))))
+    assert answers[0] == answers[1]
+    if requirement == "fastlib>=1":
+        assert {r["version"] for r in answers[1][0]["rows"]} == {"1.0", "2.0"}
+
+
+@pytest.mark.parametrize("requirement", ["fastlib==1.0", "fastlib>=1", "fastlib"])
+@pytest.mark.parametrize("doc", [None, [], {}, {"info": {"version": "1.0"}}, {"urls": None},
+    {"urls": "bad"}, {"urls": [None]}, {"urls": [{}]}, {"urls": [{"filename": None}]},
+    {"releases": {"1.0": [{}]}}])
+def test_trimming_bad_json_keeps_it_unknown(tmp_path, requirement, doc):
+    (tmp_path / "requirements.txt").write_text(requirement + "\n", encoding="utf-8")
+    docs = {"fastlib==1.0" if "==" in requirement else "fastlib": doc}
+    before = json.loads(driver.check(str(tmp_path), "requirements.txt", options(), json.dumps(docs)))
+    after = json.loads(driver.check(str(tmp_path), "requirements.txt", options(), json.dumps(trim_json(docs))))
+    assert before == after
+    assert after["rows"][0]["gaps"] == [] and len(after["rows"][0]["unknown"]) == 3
+    assert after["rows"][0]["lookup"] is False
+
+
+@pytest.mark.parametrize("releases", [None, [], {}, {"1.0": None}, {"1.0": []}])
+def test_trimming_preserves_empty_lists_and_range_fallback(tmp_path, releases):
+    (tmp_path / "requirements.txt").write_text("fastlib>=1\n", encoding="utf-8")
+    docs = {"fastlib": {"info": {"version": "1.0"}, "urls": [wheel("fastlib-1.0.tar.gz")], "releases": releases}}
+    before = json.loads(driver.check(str(tmp_path), "requirements.txt", options(), json.dumps(docs)))
+    after = json.loads(driver.check(str(tmp_path), "requirements.txt", options(), json.dumps(trim_json(docs))))
+    assert before == after
+    # Non-mapping releases falls back to info.version + urls; an empty mapping does not.
+    assert bool(after["rows"][0]["gaps"]) == (not isinstance(releases, dict))
+    raw_releases = {"fastlib": releases}
+    assert driver.fixes(json.dumps(raw_releases), json.dumps(after["rows"])) == driver.fixes(
+        json.dumps(trim_json(raw_releases, releases=True)), json.dumps(after["rows"]))
 
 
 def test_the_result_counts_the_packages_a_file_lists(tmp_path):
