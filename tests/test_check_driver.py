@@ -348,6 +348,51 @@ def test_needs_reads_a_pyprojects_direct_requirements(tmp_path):
     assert n["lookups"] == [{"name": "numpy", "version": "2.3.4"}]
 
 
+@pytest.mark.parametrize("settings", [
+    '[tool.uv.sources]\nmylib = { workspace = true }\n',
+    '[[tool.uv.index]]\nurl = "https://example.invalid/simple"\n',
+])
+def test_pyproject_with_other_sources_reports_every_private_dependency(tmp_path, settings):
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "myapp"\ndependencies = ["fastapi", "numpy", "mylib"]\n' + settings,
+        encoding="utf-8",
+    )
+    assert json.loads(driver.needs(str(tmp_path), "pyproject.toml"))["lookups"] == []
+    r = json.loads(driver.check(str(tmp_path), "pyproject.toml", options(), "{}"))
+    assert (r["listed"], r["packages"], r["private_count"]) == (3, 0, 3)
+    assert r["private"] == r["skipped"] == ["fastapi", "mylib", "numpy"]
+    assert r["looked_up"] is True and r["rows"] == []
+
+
+def test_private_count_counts_entries_not_distinct_names(tmp_path):
+    (tmp_path / "pyproject.toml").write_text(
+        '''[project]
+name = "demo"
+dependencies = ['numpy; python_version < "3.14"', 'numpy; python_version >= "3.14"']
+[tool.uv.sources]
+demo = { workspace = true }
+''', encoding="utf-8",
+    )
+    assert json.loads(driver.needs(str(tmp_path), "pyproject.toml"))["lookups"] == []
+    r = json.loads(driver.check(str(tmp_path), "pyproject.toml", options(), "{}"))
+    assert (r["listed"], r["packages"], r["private_count"]) == (2, 0, 2)
+    assert r["private"] == r["skipped"] == ["numpy"]
+
+
+def test_private_count_does_not_include_other_skipped_packages(tmp_path):
+    (tmp_path / "pyproject.toml").write_text(
+        '''[project]
+name = "demo"
+dependencies = ["numpy", "localpkg @ file:///localpkg"]
+[tool.uv.sources]
+demo = { workspace = true }
+''', encoding="utf-8",
+    )
+    r = json.loads(driver.check(str(tmp_path), "pyproject.toml", options(), "{}"))
+    assert (r["listed"], r["packages"], r["private_count"]) == (2, 0, 1)
+    assert r["private"] == ["numpy"] and r["skipped"] == ["localpkg", "numpy"]
+
+
 def test_needs_names_a_missing_include_and_works_once_its_fetched(tmp_path):
     (tmp_path / "requirements.txt").write_text("-r dev.txt\nnumpy==2.3.4\n", encoding="utf-8")
     n = json.loads(driver.needs(str(tmp_path), "requirements.txt"))
@@ -662,8 +707,7 @@ def test_trimming_preserves_empty_lists_and_range_fallback(tmp_path, releases):
 
 
 def test_the_result_counts_the_packages_a_file_lists(tmp_path):
-    # The page moves on from a pyproject.toml it picked itself only when it lists nothing: not when what it lists
-    # isn't installed on the targets picked, which is an answer.
+    # No dependencies is different from dependencies that aren't installed on the targets picked, which is an answer.
     (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo"\nversion = "0.1.0"\n', encoding="utf-8")
     r = json.loads(driver.check(str(tmp_path), "pyproject.toml", options(), "{}"))
     assert "error" not in r and (r["listed"], r["packages"], r["skipped"], r["rows"]) == (0, 0, [], [])
@@ -673,3 +717,4 @@ def test_the_result_counts_the_packages_a_file_lists(tmp_path):
     )
     r = json.loads(driver.check(str(tmp_path), "pyproject.toml", options(), "{}"))
     assert (r["listed"], r["packages"], r["skipped"], r["rows"]) == (1, 0, [], [])
+    assert r["private_count"] == 0

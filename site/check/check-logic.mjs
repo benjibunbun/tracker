@@ -101,13 +101,21 @@ export function withoutUnreadable(lockfiles, failed, auto) {
   return auto && failed.split("/").pop() === "pyproject.toml" && rest.length ? rest : null;
 }
 
+// An all-private pyproject has no browser answer. Use the driver's entry count, not private.length: its display
+// names are deduplicated, while listed counts repeated requirements (for example, with different markers).
+export function privatePyprojectReason(result) {
+  return !result.error && result.looked_up && result.lockfile?.split("/").pop() === "pyproject.toml"
+    && result.packages === 0 && result.listed > 0 && result.private_count === result.listed
+    ? "its index or source settings don't identify which packages are from PyPI" : null;
+}
+
 // Why a file's result is no answer, so that withoutUnreadable() may move on from it, or null when the result stands:
-// wheelgap couldn't read it (its error), or it was read and lists no packages at all (a pyproject.toml whose
-// [project] has no dependencies). One whose packages were all skipped, or aren't installed on the targets picked,
-// is an answer.
+// wheelgap couldn't read it, it lists no dependencies, or every pyproject dependency was skipped as private.
+// Other skipped packages, or ones not installed on the targets picked, still constitute an answer.
 export function unreadableReason(result) {
   if (result.kind === "source") return result.error || "wheelgap couldn't read it";
-  return !result.error && result.looked_up && result.listed === 0 ? "it lists no dependencies" : null;
+  if (!result.error && result.looked_up && result.listed === 0) return "it lists no dependencies";
+  return privatePyprojectReason(result);
 }
 
 // A platform's tile, from its counts ({wheel, source, missing, unknown}): how many packages have no wheel there, a ✓

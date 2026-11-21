@@ -117,6 +117,28 @@ test("a file with nothing to check is no answer; one whose packages were skipped
   assert.equal(unreadableReason({ kind: "needs-index", error: "poetry.lock needs the index" }), null);
 });
 
+test("an all-private pyproject gives way only when automatically picked and another file remains", () => {
+  const result = { lockfile: "pyproject.toml", looked_up: true, listed: 3, packages: 0,
+    private: ["fastapi", "mylib", "numpy"], private_count: 3, skipped: ["fastapi", "mylib", "numpy"] };
+  const reason = "its index or source settings don't identify which packages are from PyPI";
+  const locks = [{ path: result.lockfile }, { path: "backend/uv.lock" }];
+  assert.equal(unreadableReason(result), reason);
+  assert.deepEqual(withoutUnreadable(locks, result.lockfile, true), [locks[1]]);
+  assert.equal(withoutUnreadable(locks, result.lockfile, false), null);
+  assert.equal(withoutUnreadable([locks[0]], result.lockfile, true), null);
+  // Repeated names with different markers are separate entries, but the display names are deduplicated.
+  assert.equal(unreadableReason({ ...result, listed: 2, private_count: 2, private: ["numpy"] }), reason);
+  for (const change of [
+    { packages: 1, private_count: 2 }, // some packages were checked
+    { private_count: 2 }, // another package was skipped for a different reason, or excluded by markers
+    { listed: 2, private_count: 0, private: [] }, // all marker-excluded
+    { listed: 0, private_count: 0, looked_up: false }, // empty offline lock
+    { private_count: undefined }, // no exact count from an older driver
+    { error: "unreadable" },
+    { lockfile: "requirements.txt" },
+  ]) assert.equal(unreadableReason({ ...result, ...change }), null, JSON.stringify(change));
+});
+
 test("a result's query round-trips, and unknown values are dropped", () => {
   const state = { repo: { owner: "o", name: "r", ref: "dev" }, lockfile: "backend/uv.lock", pythons: ["3.14", "3.14t"], platforms: ["linux-aarch64", "win-arm64"] };
   const q = toQuery(state);

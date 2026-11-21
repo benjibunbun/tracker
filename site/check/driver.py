@@ -278,6 +278,8 @@ def check(root: str, lockfile: str, options_json: str, lookups_json: str | None 
     The result's `private` names the packages left off pypi.org as a private index's (they're in `skipped` too),
     and `looked_up` says whether the files came from PyPI rather than from the lockfile. `listed` counts the packages
     the file lists, checked or not: none at all for a pyproject.toml whose [project] has no dependencies.
+    `private_count` counts entries too, not distinct names: two requirements for one name with different markers
+    must both count when the page asks whether every entry was skipped as private.
     """
     global _last_check
     _last_check = None
@@ -362,6 +364,7 @@ def check(root: str, lockfile: str, options_json: str, lookups_json: str | None 
             "listed": len(source.packages),
             "skipped": sorted({p.name for p in source.packages if p.skip}),
             "private": sorted({p.name for p in source.packages if p.skip == "private index"}),
+            "private_count": sum(p.skip == "private index" for p in source.packages),
             "looked_up": looked_up,
             "per_target": per_target,
             "rows": rows,

@@ -4,7 +4,7 @@
 import {
   PLATFORMS, PYTHONS, parseRepo, pickLockfile, toQuery, fromQuery, sortPythons, freeThreaded,
   fixFor, rowsFor, headline, cliCommand, fixPrompt, verdictText, nextSteps, validRef, labVerdict, labFor, canonicalName, gapWheelFor,
-  gapWheelFixText, withoutUnreadable, unreadableReason, tileText, missedText, badgeMarkdown,
+  gapWheelFixText, withoutUnreadable, unreadableReason, privatePyprojectReason, tileText, missedText, badgeMarkdown,
 } from "./check-logic.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -182,7 +182,7 @@ function onResult(result) {
   const reason = unreadableReason(result);
   const rest = reason ? withoutUnreadable(state.plan.lockfiles, state.lockfile, state.auto) : null;
   if (rest) {
-    // A pyproject.toml the page picked itself, with no dependencies wheelgap can read (or none at all): the repo's
+    // A pyproject.toml the page picked itself, with no dependencies the browser can check (or none at all): the repo's
     // next file is checked instead, and "What was read" says why this one wasn't.
     state.detected.unreadable.push({ path: state.lockfile, line: null, reason });
     state.plan.lockfiles = rest;
@@ -246,10 +246,12 @@ function render() {
 function renderVerdict() {
   const r = state.result;
   const h = headline(r);
+  const privateReason = privatePyprojectReason(r);
   const card = $("verdict").closest("section");
   const repoName = `${state.repo.owner}/${state.repo.name}`;
   card.classList.toggle("clean", h.gaps === 0 && h.unknown === 0 && h.targets > 0 && h.packages > 0);
-  $("verdict").textContent = h.targets === 0 ? `${repoName}'s lockfile leaves out every Python picked` : verdictText(h);
+  $("verdict").textContent = privateReason ? `${r.lockfile} wasn't checked: ${privateReason}`
+    : h.targets === 0 ? `${repoName}'s lockfile leaves out every Python picked` : verdictText(h);
   const steps = nextSteps(state.pythons, state.platforms);
   $("next").hidden = !steps.length;
   $("next-buttons").replaceChildren(...steps.map((s) => el("button", {
@@ -268,7 +270,12 @@ function renderVerdict() {
   if (missed) alerts.push(el("p", { class: "alert warn", text: missed }));
   const some = (names) => `${names.slice(0, 8).join(", ")}${names.length > 8 ? `, and ${names.length - 8} more` : ""}`;
   const privateIndex = r.private || [];
-  if (privateIndex.length) {
+  if (privateReason) {
+    // The zero-package result hides "Fix it", so keep the local command here with the explanation.
+    alerts.push(el("p", { class: "alert warn" },
+      "Check locally with ", el("code", { text: cliCommand(r, state.pythons, state.platforms) }),
+      " in a checkout (add --index-url for your index), or commit a uv.lock: this page reads its recorded files without PyPI lookups."));
+  } else if (privateIndex.length) {
     alerts.push(el("p", { class: "alert warn", text: `Not checked: ${r.lockfile} names an index or source other than PyPI (an --index-url or --extra-index-url line, a [tool.uv] index or sources setting, a Pipfile source), so these may not be PyPI's packages and their names aren't sent to pypi.org: ${some(privateIndex)}. To check them on that index, run uvx wheelgap --index-url with its URL in a checkout.` }));
   }
   const skipped = r.skipped.filter((name) => !privateIndex.includes(name));
@@ -276,7 +283,7 @@ function renderVerdict() {
     alerts.push(el("p", { class: "alert", text: `Not checked, since they aren't from PyPI (the project itself, or path, Git and workspace packages): ${some(skipped)}.` }));
   }
   const base = r.lockfile.split("/").pop();
-  if (r.looked_up && (base === "pyproject.toml" || base.startsWith("requirements"))) {
+  if (!privateReason && r.looked_up && (base === "pyproject.toml" || base.startsWith("requirements"))) {
     alerts.push(el("p", { class: "alert", text: `${r.lockfile} is checked for its direct requirements, as uvx wheelgap ${r.lockfile} does; uvx wheelgap --deps ${r.lockfile} on the command line checks the whole dependency tree.` }));
   }
   $("alerts").replaceChildren(...alerts);

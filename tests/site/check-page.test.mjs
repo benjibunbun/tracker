@@ -282,3 +282,104 @@ test("the badge is a small static image on the page's own origin, offered as Mar
   assert.match(page, /\$\("copy-badge"\)\.onclick = \(e\) => copy\(e\.currentTarget, \$\("badge-md"\)\.textContent, "Badge Markdown copied"\);/);
   assert.doesNotMatch(page, /innerHTML/);
 });
+
+// Exercise the page's actual selection and render pipeline, with the worker and DOM stood in. The driver contract
+// is pinned by test_check_driver.py; these tests check what the visitor sees after that result reaches the page.
+function resultPage(locks, query = null) {
+  const source = read("check.mjs");
+  const fn = (name) => source.match(new RegExp(`^function ${name}\\(.*?^}$`, "ms"))[0];
+  const elements = new Map();
+  class Element {
+    constructor() {
+      this.children = [];
+      this.hidden = false;
+      const classes = new Set();
+      this.classList = {
+        remove: (v) => classes.delete(v),
+        contains: (v) => classes.has(v),
+        toggle: (v, on) => on ? classes.add(v) : classes.delete(v),
+      };
+    }
+    set textContent(text) { this.children = [text]; }
+    get textContent() { return this.children.map((c) => typeof c === "string" ? c : c.textContent).join(""); }
+    append(...kids) { this.children.push(...kids); }
+    replaceChildren(...kids) { this.children = kids; }
+    setAttribute(k, v) { this[k] = v; }
+    addEventListener(k, v) { this[`on${k}`] = v; }
+    closest() { return this.section ??= new Element(); }
+  }
+  const $ = (id) => {
+    if (!elements.has(id)) elements.set(id, new Element());
+    return elements.get(id);
+  };
+  const state = { repo: { owner: "example", name: "project", dir: null }, query,
+    python: null, platform: null, pythons: [], platforms: [] };
+  const posts = [];
+  const env = { ...checkLogic, $, state, document: { createElement: () => new Element() },
+    NAMES: Object.fromEntries(checkLogic.PLATFORMS), STAGES: {},
+    worker: { postMessage: (m) => posts.push(m) }, history: { replaceState() {} },
+    status() {}, loadLab() {}, keepFocus: (fn) => fn(), renderTargets() {}, renderTable() {}, renderNext() {},
+  };
+  const functions = ["el", "chip", "onLoaded", "runCheck", "onResult", "render", "renderVerdict", "renderSetup", "hideResultSections"];
+  const page = new Function(...Object.keys(env), `let seq = 0; ${functions.map(fn).join("\n")}; return {onLoaded, onResult};`)(...Object.values(env));
+  page.onLoaded({ plan: { lockfiles: locks, workflows: [] },
+    detected: { found: [], unreadable: [], pythons: ["3.14"], platforms: ["linux-x86_64"] }, ref: "HEAD", root: "/repos/1" });
+  return { ...page, $, state, posts };
+}
+
+const privateResult = {
+  wheelgap: "0.13.0", lockfile: "pyproject.toml", looked_up: true, listed: 3, packages: 0, private_count: 3,
+  private: ["fastapi", "mylib", "numpy"], skipped: ["fastapi", "mylib", "numpy"], rows: [], outside_lock: [],
+  targets: [{ python: "3.14", platform: "linux-x86_64", label: "3.14 linux-x86_64" }],
+};
+const projectLocks = [{ path: "pyproject.toml", offline: false }, { path: "backend/uv.lock", offline: true }];
+
+test("an auto-picked all-private pyproject actually checks the next file and records why", () => {
+  const page = resultPage([...projectLocks]);
+  page.onResult(privateResult);
+  assert.deepEqual(page.posts.map((m) => m.lockfile), ["pyproject.toml", "backend/uv.lock"]);
+  page.onResult({ ...privateResult, lockfile: "backend/uv.lock", looked_up: false, packages: 2,
+    private: [], private_count: 0, skipped: [] });
+  assert.match(page.$("verdict").textContent, /All 2 packages have a wheel/);
+  assert.match(page.$("read-list").textContent, /Not read: pyproject.toml.*index or source settings/);
+  assert.equal(page.$("out").hidden, false);
+});
+
+for (const [label, locks, query] of [
+  ["no alternative", [projectLocks[0]], null],
+  ["explicit link", projectLocks, { lockfile: "pyproject.toml" }],
+  ["visitor's selection", projectLocks, null],
+]) test(`an all-private pyproject with ${label} stays selected and shows the local command`, () => {
+  const page = resultPage([...locks], query);
+  if (label === "visitor's selection") {
+    // Render a prior result to install the real picker's handler, then choose pyproject.toml.
+    page.onResult({ ...privateResult, packages: 1, private_count: 2 });
+    page.$("lockfile").value = "pyproject.toml";
+    page.$("lockfile").onchange();
+  }
+  const posted = page.posts.length;
+  page.onResult(privateResult);
+  assert.equal(page.posts.length, posted, "no fallback request");
+  assert.equal(page.state.lockfile, "pyproject.toml");
+  assert.match(page.$("verdict").textContent, /pyproject.toml wasn't checked.*index or source settings/);
+  assert.match(page.$("alerts").textContent, /uvx wheelgap pyproject.toml -p 3.14 -t linux-x86_64/);
+  assert.match(page.$("alerts").textContent, /or commit a uv.lock/);
+  assert.equal(page.$("out").hidden, false);
+  assert.equal(page.$("verdict").closest().hidden, false);
+  assert.equal(page.$("verdict").closest().classList.contains("clean"), false);
+  for (const id of ["targets-title", "gaps-title", "next-title"]) assert.equal(page.$(id).closest().hidden, true);
+  assert.equal(page.$("setup-title").closest().hidden, false);
+  // A later useful result clears the private-file recovery text and restores the results.
+  page.onResult({ ...privateResult, packages: 1, private_count: 0, private: [], skipped: [] });
+  assert.doesNotMatch(page.$("alerts").textContent, /or commit a uv.lock/);
+  assert.equal(page.$("gaps-title").closest().hidden, false);
+});
+
+test("some private and some checked packages remain an answer even with another file available", () => {
+  const page = resultPage([...projectLocks]);
+  page.onResult({ ...privateResult, packages: 1, private_count: 2 });
+  assert.equal(page.posts.length, 1);
+  assert.equal(page.state.lockfile, "pyproject.toml");
+  assert.doesNotMatch(page.$("verdict").textContent, /wasn't checked/);
+  assert.match(page.$("alerts").textContent, /Not checked: pyproject.toml/);
+});
