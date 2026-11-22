@@ -345,6 +345,24 @@ test("an auto-picked all-private pyproject actually checks the next file and rec
   assert.equal(page.$("out").hidden, false);
 });
 
+test("an all-private pyproject never gives way to a looked-up file its settings cover", () => {
+  // backend/requirements.txt is under the root pyproject.toml's [tool.uv] index settings, so its names are private
+  // too: no second check is posted, and the page stays on pyproject.toml with the local command.
+  const page = resultPage([{ path: "pyproject.toml", offline: false }, { path: "backend/requirements.txt", offline: false }]);
+  page.onResult(privateResult);
+  assert.equal(page.posts.length, 1, "no fallback request");
+  assert.equal(page.state.lockfile, "pyproject.toml");
+  assert.match(page.$("verdict").textContent, /pyproject.toml wasn't checked/);
+  // An offline lockfile anywhere is still a fine next file: it sends no names anywhere.
+  const offline = resultPage([{ path: "pyproject.toml", offline: false }, { path: "backend/requirements.txt", offline: false }, { path: "backend/uv.lock", offline: true }]);
+  offline.onResult(privateResult);
+  assert.deepEqual(offline.posts.map((m) => m.lockfile), ["pyproject.toml", "backend/uv.lock"]);
+  // A nested private pyproject covers only its own folder: a looked-up file beside it stays, one elsewhere is next.
+  const nested = resultPage([{ path: "app/pyproject.toml", offline: false }, { path: "app/requirements.txt", offline: false }, { path: "tools/requirements.txt", offline: false }]);
+  nested.onResult({ ...privateResult, lockfile: "app/pyproject.toml" });
+  assert.deepEqual(nested.posts.map((m) => m.lockfile), ["app/pyproject.toml", "tools/requirements.txt"]);
+});
+
 for (const [label, locks, query] of [
   ["no alternative", [projectLocks[0]], null],
   ["explicit link", projectLocks, { lockfile: "pyproject.toml" }],

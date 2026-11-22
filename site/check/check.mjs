@@ -180,7 +180,15 @@ function onResult(result) {
   $("go").disabled = false;
   if (result.kind === "needs-index") return needsIndex(state.lockfile);
   const reason = unreadableReason(result);
-  const rest = reason ? withoutUnreadable(state.plan.lockfiles, state.lockfile, state.auto) : null;
+  let rest = reason ? withoutUnreadable(state.plan.lockfiles, state.lockfile, state.auto) : null;
+  if (rest && privatePyprojectReason(result)) {
+    // Its index or source settings apply to the files that look packages up in its folder and below (uv reads
+    // [tool.uv] from there), so those names are as private as its own: move on only to a lockfile read offline, or a
+    // file elsewhere in the repo.
+    const dir = state.lockfile.includes("/") ? state.lockfile.slice(0, state.lockfile.lastIndexOf("/") + 1) : "";
+    rest = rest.filter((l) => l.offline || !l.path.startsWith(dir));
+    if (!rest.length) rest = null;
+  }
   if (rest) {
     // A pyproject.toml the page picked itself, with no dependencies the browser can check (or none at all): the repo's
     // next file is checked instead, and "What was read" says why this one wasn't.
