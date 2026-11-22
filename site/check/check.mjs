@@ -2,7 +2,7 @@
 // Everything shown from the repo or PyPI goes in with textContent, never as HTML.
 
 import {
-  PLATFORMS, PYTHONS, parseRepo, pickLockfile, toQuery, fromQuery, sortPythons, freeThreaded,
+  PLATFORMS, PYTHONS, parseRepo, inputHint, pickLockfile, pickRequestedFile, toQuery, fromQuery, sortPythons, freeThreaded,
   fixFor, rowsFor, headline, cliCommand, fixPrompt, verdictText, nextSteps, validRef, labVerdict, labFor, canonicalName, gapWheelFor,
   gapWheelFixText, withoutUnreadable, unreadableReason, privatePyprojectReason, tileText, missedText, badgeMarkdown,
 } from "./check-logic.mjs";
@@ -69,13 +69,42 @@ const worker = new Worker(new URL("./worker.mjs", import.meta.url), { type: "mod
 let seq = 0;
 let wheelgapVersion = null;
 const state = {
-  repo: null, ref: null, root: null, plan: null, detected: null, lockfile: null, auto: false, pythons: [], platforms: [],
+  repo: null, ref: null, root: null, plan: null, detected: null, lockfile: null, auto: false, fileNotice: null, pythons: [], platforms: [],
   result: null, fixes: null, gapWheels: null, fixesDone: false, python: null, platform: null, showAll: false, truncated: false, lab: {},
+  inputError: false,
 };
 
-function status(text, error = false) {
-  $("status").textContent = text;
+function status(content, error = false) {
+  if (Array.isArray(content)) $("status").replaceChildren(...content);
+  else $("status").textContent = content;
   $("status").classList.toggle("error", error);
+}
+
+// Shown until the next check starts: the worker's start-up progress and "Ready." lines mustn't replace it.
+function showInputError(raw) {
+  state.inputError = true;
+  const hint = inputHint(raw);
+  if (hint?.kind === "package") {
+    status([
+      `${raw.trim()} looks like a package, not a repository. `,
+      el("a", { href: `../p/${encodeURIComponent(hint.name)}/` }, "See its wheel coverage"),
+      ", or ",
+      el("a", { href: "../" }, "search packages"),
+      ".",
+    ], true);
+    return;
+  }
+  if (hint?.kind === "other-host") {
+    status([
+      "This page reads public GitHub repositories only. For a GitLab or other checkout, run ",
+      el("code", { text: "uvx wheelgap" }),
+      " in it (",
+      el("a", { href: "https://github.com/wheelgap/wheelgap/blob/main/docs/getting-started.md", rel: "noopener" }, "getting started"),
+      ").",
+    ], true);
+    return;
+  }
+  status("That doesn't look like a GitHub repository. Try owner/name or a github.com URL.", true);
 }
 
 // Re-rendering replaces buttons; this puts keyboard focus back on the one with the same data-key.
@@ -97,12 +126,12 @@ worker.onmessageerror = () => workerFailed("The checker sent something the page 
 
 worker.onmessage = ({ data }) => {
   if (data.type === "progress") {
-    if (data.id === undefined || data.id === seq) status(STAGES[data.stage] || "Working…"); // not a dropped request's
+    if (data.id === undefined ? !state.inputError : data.id === seq) status(STAGES[data.stage] || "Working…"); // not a dropped request's
     return;
   }
   if (data.type === "ready") {
     wheelgapVersion = data.wheelgap;
-    if (!state.repo) status(`Ready. wheelgap ${data.wheelgap} is running in your browser.`);
+    if (!state.repo && !state.inputError) status(`Ready. wheelgap ${data.wheelgap} is running in your browser.`);
     return;
   }
   if (data.id !== undefined && data.id !== seq) return; // an answer to a request the page has moved on from
@@ -130,22 +159,27 @@ worker.onmessage = ({ data }) => {
 };
 
 function start(repo, query = null) {
+  state.inputError = false;
   state.repo = repo;
   state.query = query;
   state.result = null;
+  state.fileNotice = null;
   $("out").hidden = true;
   $("go").disabled = true;
   $("repo").value = `${repo.owner}/${repo.name}${repo.ref ? `@${repo.ref}` : ""}`;
   status(wheelgapVersion ? STAGES.tree : STAGES.python);
-  worker.postMessage({ id: ++seq, type: "load", repo });
+  worker.postMessage({ id: ++seq, type: "load", repo, file: query?.lockfile || repo.file || null });
 }
 
-function onLoaded({ plan, detected, truncated, ref, root }) {
+function onLoaded({ plan, detected, truncated, ref, root, fileInTree }) {
   Object.assign(state, { plan, detected, truncated, ref, root });
   const q = state.query;
-  const named = q?.lockfile && plan.lockfiles.find((l) => l.path === q.lockfile);
-  const lock = named || pickLockfile(plan.lockfiles, state.repo.dir);
-  state.auto = !named; // the page's own pick, not one a link or the visitor named
+  const requested = q?.lockfile || state.repo.file || null;
+  const picked = pickRequestedFile(plan.lockfiles, requested, Boolean(fileInTree), state.repo.dir);
+  plan.lockfiles = picked.lockfiles;
+  const lock = picked.lock;
+  state.auto = picked.auto; // the page's own pick, not one a link or the visitor named
+  state.fileNotice = picked.notice;
   if (!lock) {
     status("");
     $("go").disabled = false;
@@ -198,7 +232,8 @@ function onResult(result) {
     return runCheck();
   }
   if (result.error) {
-    status(result.kind === "source" ? `wheelgap couldn't read ${state.lockfile}: ${result.error}` : result.error, true);
+    const notice = state.fileNotice ? `${state.fileNotice} Checked ${state.lockfile} instead, and ` : "";
+    status(result.kind === "source" ? `${notice}${notice ? "w" : "W"}heelgap couldn't read ${state.lockfile}: ${result.error}` : `${notice}${result.error}`, true);
     return;
   }
   state.result = result;
@@ -214,7 +249,8 @@ function onResult(result) {
 function noLockfile() {
   $("out").hidden = false;
   $("verdict").textContent = "No lockfile found";
-  $("verdict-detail").textContent = `The repo check reads a uv.lock, poetry.lock, pdm.lock, pylock.toml, Pipfile.lock, requirements.txt, pixi.lock or pyproject.toml, and ${state.repo.owner}/${state.repo.name} has none${state.truncated ? " in the part of its file list GitHub returned" : ""}. Run uvx wheelgap in a checkout for anything else.`;
+  const prefix = state.fileNotice ? `${state.fileNotice} ` : "";
+  $("verdict-detail").textContent = `${prefix}The repo check reads a uv.lock, poetry.lock, pdm.lock, pylock.toml, Pipfile.lock, requirements.txt, pixi.lock or pyproject.toml, and ${state.repo.owner}/${state.repo.name} has none${state.truncated ? " in the part of its file list GitHub returned" : ""}. Run uvx wheelgap in a checkout for anything else.`;
   for (const id of ["alerts"]) $(id).replaceChildren();
   hideResultSections(true);
 }
@@ -225,7 +261,7 @@ function needsIndex(path) {
   status("");
   $("verdict").textContent = `${path.split("/").pop()} needs PyPI lookups`;
   $("verdict-detail").textContent = `It doesn't list each package's files, so the browser check can't read it offline. Run uvx wheelgap ${path} in a checkout instead.`;
-  $("alerts").replaceChildren();
+  $("alerts").replaceChildren(...(state.fileNotice ? [el("p", { class: "alert warn", text: `${state.fileNotice} Checked ${path} instead.` })] : []));
   renderSetup();
   hideResultSections(true, true);
 }
@@ -268,6 +304,9 @@ function renderVerdict() {
   })));
   $("verdict-detail").textContent = `${repoName} · ${r.lockfile}${state.ref && state.ref !== "HEAD" ? ` at ${state.ref}` : ""} · Python ${sortPythons(state.pythons).join(", ")} on ${state.platforms.length} platform${state.platforms.length === 1 ? "" : "s"}`;
   const alerts = [];
+  if (state.fileNotice) {
+    alerts.push(el("p", { class: "alert warn", text: `${state.fileNotice} Checked ${r.lockfile} instead.` }));
+  }
   if (r.outside_lock.length) {
     alerts.push(el("p", { class: "alert warn", text: `${r.lockfile} only allows Python ${r.requires_python}, so it has no wheels for ${r.outside_lock.join(", ")} and those aren't counted. Widening requires-python and re-locking is the first step there.` }));
   }
@@ -336,7 +375,7 @@ function renderSetup() {
   const locks = state.plan.lockfiles;
   $("lock-pick").hidden = locks.length < 2;
   $("lockfile").replaceChildren(...locks.map((l) => el("option", { value: l.path, selected: l.path === state.lockfile, text: l.offline ? l.path : `${l.path} (looks packages up on PyPI)` })));
-  $("lockfile").onchange = () => { state.lockfile = $("lockfile").value; state.auto = false; runCheck(); };
+  $("lockfile").onchange = () => { state.lockfile = $("lockfile").value; state.auto = false; state.fileNotice = null; runCheck(); };
 
   const repoUrl = `https://github.com/${state.repo.owner}/${state.repo.name}/blob/${encodeURIComponent(state.ref || "HEAD")}/`;
   const link = (path, line) => el("a", { href: `${repoUrl}${path.split("/").map(encodeURIComponent).join("/")}${line ? `#L${line}` : ""}`, rel: "noopener" }, el("code", { text: `${path}${line ? `:${line}` : ""}` }));
@@ -430,7 +469,7 @@ function renderNext() {
   const r = state.result;
   $("cli").textContent = cliCommand(r, state.pythons, state.platforms);
   // The link names the lockfile only when a visit with the repo alone would start from another one.
-  $("badge-md").textContent = badgeMarkdown(state.repo, r.lockfile, pickLockfile(state.plan.lockfiles, null)?.path ?? null);
+  $("badge-md").textContent = badgeMarkdown(state.repo, r.lockfile, pickLockfile(state.plan.lockfiles.filter((l) => !l.added), null)?.path ?? null);
   const caveats = [
     "A wheel on PyPI means pip and uv install it without compiling; it doesn't test that the package works there.",
     r.looked_up
@@ -468,9 +507,12 @@ $("form").addEventListener("submit", (e) => {
   const at = text.match(/^([^\s@]+\/[^\s@]+)@([A-Za-z0-9._\/-]+)$/); // owner/name@ref
   if (at) [, text, ref] = at;
   const repo = parseRepo(text);
-  if (!repo) return status("That doesn't look like a GitHub repository. Try owner/name or a github.com URL.", true);
+  if (!repo) return showInputError(text);
   if (ref) {
-    if (!validRef(ref)) return status("That branch or tag name isn't one this page can read.", true);
+    if (!validRef(ref)) {
+      state.inputError = true; // like showInputError(): start-up progress mustn't replace it
+      return status("That branch or tag name isn't one this page can read.", true);
+    }
     repo.ref = ref;
   }
   start(repo);
@@ -479,3 +521,10 @@ for (const b of document.querySelectorAll("[data-repo]")) b.addEventListener("cl
 
 const initial = fromQuery(location.search);
 if (initial) start(initial.repo, initial);
+else {
+  const rawRepo = new URLSearchParams(location.search).get("repo");
+  if (rawRepo) {
+    $("repo").value = rawRepo;
+    showInputError(rawRepo);
+  }
+}
